@@ -20,9 +20,14 @@
     precision highp float;
     #endif
 
-    void main()
-    {
-      gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0);
+    varying vec2 vUv;
+
+    void main() {
+        vUv = uv;
+
+        gl_Position =   projectionMatrix * 
+                        modelViewMatrix * 
+                        vec4(position,1.0);
     }
     </script>
 
@@ -33,9 +38,11 @@
     precision highp float;
     #endif
 
-    void main()
-    {
-      gl_FragColor  = vec4(1.0,0.0,1.0,1.0);
+    uniform sampler2D texture1;
+    varying vec2 vUv;
+
+    void main() {
+        gl_FragColor = texture2D(texture1, vUv);
     }
     </script>
 
@@ -43,18 +50,21 @@
   <script id="Main" >
 
      //-------------VARIABLES-------------------
-    var waterMesh, mainRenderer, scene, camera, waterSurface, controls, container, uniforms, gl;
+    var scene, sceneRTT, camera, controls, container;
+    var waterMesh, waterSurface;
+    var mainRenderer, reflectionTextureRT; 
+    var uniforms, gl;
 
      //-------------FUNCTIONS-------------------
 
     init = function() {
 
       camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 1, 10000);
-      camera.position.z = 0;
-      camera.position.y = 350;
-      camera.position.x = -200;
+      camera.position.set(-200,350,0);
 
       scene = new THREE.Scene();
+     // sceneRTT = new THREE.Scene(); //render to texture
+
 
 
       addLights();
@@ -66,9 +76,7 @@
       controls = new THREE.OrbitControls(camera);
       mainRenderer = new THREE.WebGLRenderer();
 
-        // setup GLSL program
-     //var program = webglUtils.createProgramFromScripts(gl, ["watershader", "watershader.fragment"]);
-     //container.appendChild( mainRenderer.domElement );
+   
       //Update viewport window and update if window is resized
       updateViewport();
       window.addEventListener('resize', updateViewport); 
@@ -90,11 +98,25 @@
       //dt = Date.now() - now; // tidsskillnad
 
       requestAnimationFrame(animate);
-      mainRenderer.render(scene, camera);
       controls.update();
+      render();
+
+
 
       //return now = Date.now();
     }; 
+
+    render = function() {
+
+        mainRenderer.clear();
+
+        // Render first scene into texture
+
+        // Render second scene to screen
+        // (using first scene as regular texture)
+        mainRenderer.render(scene, camera);
+
+    };
 
 
 
@@ -111,11 +133,21 @@
       //Create water buffer plane
       waterSurface = new THREE.PlaneBufferGeometry(W,H);
 
+      var watertex = new THREE.TextureLoader().load('textures/blue.jpg');
+
+      var uniforms = {
+        texture1: { type: 't',
+                  value: watertex
+                  }
+      };
+
       
       // create the Shadermaterial for the water
       var shaderMaterial = new THREE.ShaderMaterial({
+        uniforms: uniforms,
         vertexShader:   $('#vertexShader').text(),
-        fragmentShader: $('#fragmentShader').text()
+        fragmentShader: $('#fragmentShader').text(),
+        //depthWrite: false
       });
 
       //material and mesh
