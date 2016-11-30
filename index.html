@@ -6,8 +6,9 @@
 
 </head>
 <body>
-	<div id="container"></div>
-	<script src='js/threeNew.min.js'></script>
+
+	<script src='js/three.min.js'></script>
+    <script src='js/Mirror.js'></script>
 	<script src='js/controls/OrbitControls.js'></script>
   <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.5.1/jquery.min.js"></script>
 
@@ -38,11 +39,18 @@
     precision highp float;
     #endif
 
-    uniform sampler2D tDiffuse;
+    //out vec4 out_Color;
+
+    uniform sampler2D reflectionTex;
     varying vec2 vUv;
 
     void main() {
-        gl_FragColor = texture2D(tDiffuse, vUv);
+        
+        gl_FragColor = texture2D(reflectionTex, vUv);
+        //vec4 reflectColour = texture(reflectionTex, textureCoords);
+        //vec4 refractColor = texture(refractTex, textureCoords);
+
+        //out_Color = mix(reflectColour, refractColour, 0.5)
     }
     </script>
 
@@ -52,10 +60,10 @@
      //-----------GLOBAL VARIABLES-------------------
     var scene, camera, controls, container;
     var waterMesh, waterSurface;
-    var mainRenderer, reflectionTextureRT; 
+    var mainRenderer; 
     var uniforms;
 
-    var myTexture;
+    var reflectionTexture, reflectionSurface;
 
      //-------------FUNCTIONS-------------------
 
@@ -67,9 +75,8 @@
 
       mainRenderer = new THREE.WebGLRenderer();
 
-
-        RTT();
-        loadWater();
+      //RTT();
+      loadWater();
 
 
       mainRenderer.autoClear = false;
@@ -79,7 +86,6 @@
 
 
       document.body.appendChild(mainRenderer.domElement);
-      //document.body.appendChild(waterRenderer.domElement);
 
     };
 
@@ -90,6 +96,7 @@
 
         camera.aspect = window.innerWidth / window.innerHeight;
         camera.updateProjectionMatrix();
+
         return controls.target.set(0, 0, 0);
     };
 
@@ -104,12 +111,14 @@
       //return now = Date.now();
     }; 
 
-    render = function() {
+    function render(){
 
         mainRenderer.clear();
 
         // Render first scene into texture
-        mainRenderer.render(scene, camera, myTexture, true);
+
+        //mainRenderer.render(scene, reflectionCamera, reflectionTexture, true);
+        reflectionSurface.render();
 
         //render scene
         mainRenderer.render(scene, camera);
@@ -130,51 +139,54 @@
       loadSkyBoxAndFloor();
 
     };
-
+/*
+    //render to texture
     function RTT(){
 
         // you may need to modify these parameters
         var renderTargetParams = { minFilter: THREE.LinearFilter, magFilter: THREE.NearestFilter, format: THREE.RGBFormat } ;
 
         // create buffer
-        myTexture = new THREE.WebGLRenderTarget( window.innerWidth , window.innerHeight , renderTargetParams );
-
+        reflectionTexture = new THREE.WebGLRenderTarget( window.innerWidth , window.innerHeight , renderTargetParams );
     };
 
+*/
 
     loadWater= function(){
       //Storlek på vattenytan
-      var W = 290;
-      var H = 590;
-
-      //Upplösning på vattenytan
-      var NH = 1; 
-      var NW = 1;
+      var W = 280;
+      var H = 580;
 
       //Create water buffer plane
       waterSurface = new THREE.PlaneBufferGeometry(W,H);
 
+      reflectionSurface =  new THREE.Mirror( mainRenderer, camera, { clipBias: 0.003, textureWidth: window.innerWidth , textureHeight: window.innerHeight, color: 0x777777 } );
+
 
       // create the Shadermaterial for the water
+      /*
       var shaderMaterial = new THREE.ShaderMaterial({
-        uniforms:        { tDiffuse: { type: 't',
-                  value: myTexture.texture
+        uniforms:        { reflectionTex: { type: 't',
+                  value: reflectionTexture.texture
                   }},
         vertexShader:   $('#vertexShader').text(),
         fragmentShader: $('#fragmentShader').text(),
         //depthWrite: false
       });
-
+      */
       //var shaderMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff, map: myTexture.texture});
 
       //material and mesh
-      waterMesh = new THREE.Mesh(waterSurface, shaderMaterial);
+      waterMesh = new THREE.Mesh(waterSurface, reflectionSurface.material);
+      waterMesh.add( reflectionSurface );
       scene.add(waterMesh);
 
       //transform matrix on watersurface
       var matrix = new THREE.Matrix4();
       matrix.makeRotationX(-Math.PI / 2);
-      waterSurface.applyMatrix(matrix);
+      waterMesh.applyMatrix(matrix);
+      waterMesh.position.y += 15;
+
     
     };
 
@@ -189,8 +201,6 @@
 
       spotLight.castShadow = true;
 
-      //spotLight.shadowMapWidth = 1024;
-      //spotLight.shadowMapHeight = 1024;
       spotLight.shadow.mapSize.width = 1024;
       spotLight.shadow.mapSize.height= 1024;
 
@@ -199,7 +209,7 @@
       spotLight.shadow.cameraov = 30;
 
       scene.add( spotLight );
-      //sceneRTT.add(spotLight );
+
     };
 
     function loadBathtub(){
@@ -372,24 +382,24 @@
     function loadSkyBoxAndFloor(){
      //----------SKYBOX---------------------
       // code from http://stemkoski.github.io/Three.js/Skybox.html
-            var imagePrefix = "textures/heaven/";
-            var directions  = ["right", "left", "top", "back", "front", "back"]; //down does not exist, use back
-            var imageSuffix = ".png";
-            var skyGeometry = new THREE.BoxGeometry( 10000, 10000, 10000 ); 
-            
-            // create array for images to skybox
-            var materialArray = [];
-            for (var i = 0; i < 6; i++)
-              materialArray.push( new THREE.MeshBasicMaterial({
-                map: THREE.ImageUtils.loadTexture( imagePrefix + directions[i] + imageSuffix ),
-                side: THREE.BackSide
-              }));
-            var skyMaterial = new THREE.MeshFaceMaterial( materialArray );
-            
-            // testing variable for test without textures
-            //var himmelmaterial = new THREE.MeshBasicMaterial( { color: 0x00ff00, side: THREE.BackSide } );
-            var skyBox = new THREE.Mesh( skyGeometry, skyMaterial );
-            scene.add( skyBox );
+      var imagePrefix = "textures/heaven/";
+      var directions  = ["right", "left", "top", "back", "front", "back"]; //down does not exist, use back
+      var imageSuffix = ".png";
+      var skyGeometry = new THREE.BoxGeometry( 10000, 10000, 10000 ); 
+      
+      // create array for images to skybox
+      var materialArray = [];
+      for (var i = 0; i < 6; i++)
+        materialArray.push( new THREE.MeshBasicMaterial({
+          map: THREE.ImageUtils.loadTexture( imagePrefix + directions[i] + imageSuffix ),
+          side: THREE.BackSide
+        }));
+      var skyMaterial = new THREE.MeshFaceMaterial( materialArray );
+      
+      // testing variable for test without textures
+      //var himmelmaterial = new THREE.MeshBasicMaterial( { color: 0x00ff00, side: THREE.BackSide } );
+      var skyBox = new THREE.Mesh( skyGeometry, skyMaterial );
+      scene.add( skyBox );
 
 
       //----------FLOOR---------------------
