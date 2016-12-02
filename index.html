@@ -8,7 +8,7 @@
 <body>
 
 	<script src='js/three.min.js'></script>
-    <script src='js/Mirror.js'></script>
+    <script src='js/MyWater.js'></script>
 	<script src='js/controls/OrbitControls.js'></script>
   <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.5.1/jquery.min.js"></script>
 
@@ -79,7 +79,7 @@
       loadWater();
 
 
-      mainRenderer.autoClear = false;
+      //mainRenderer.autoClear = false;
       //Update viewport window and update if window is resized
       updateViewport();
       window.addEventListener('resize', updateViewport); 
@@ -133,10 +133,12 @@
 
       //navigate in scene
       controls = new THREE.OrbitControls(camera);
+      controls.maxPolarAngle = Math.PI/2.1; 
       
       addLights();
       loadBathtub();
       loadSkyBoxAndFloor();
+      loadObjects();
 
     };
 /*
@@ -160,7 +162,7 @@
       //Create water buffer plane
       waterSurface = new THREE.PlaneBufferGeometry(W,H);
 
-      reflectionSurface =  new THREE.Mirror( mainRenderer, camera, { clipBias: 0.003, textureWidth: window.innerWidth , textureHeight: window.innerHeight, color: 0x777777 } );
+      reflectionSurface =  new THREE.Water( mainRenderer, camera, { textureWidth: window.innerWidth , textureHeight: window.innerHeight} );
 
 
       // create the Shadermaterial for the water
@@ -443,6 +445,19 @@
       scene.add(floorMesh4);
 
     };
+
+     function loadObjects(){
+
+      var sphere = new THREE.SphereGeometry(50, 50, 50);
+      var sphereMat = new THREE.MeshPhongMaterial( { color: 0x555555, specular: 0xffaa00, shininess: 5 } );
+      var sphereMesh = new THREE.Mesh(sphere, sphereMat);
+      sphereMesh.position.y += 50;
+      sphereMesh.position.x += 100;
+            sphereMesh.position.z += 100;
+
+      scene.add(sphereMesh);
+
+     }
 
 
      //----------CALL THE MOST IMPORTANT FUNCTIONS----------------
