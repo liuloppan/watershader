@@ -130,6 +130,7 @@
 
       camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 1, 10000);
       camera.position.set(-200,350,0);
+      //camera.rotation(x,y,z);
 
       //navigate in scene
       controls = new THREE.OrbitControls(camera);
@@ -163,20 +164,6 @@
       waterSurface = new THREE.PlaneBufferGeometry(W,H);
 
       reflectionSurface =  new THREE.Water( mainRenderer, camera, { textureWidth: window.innerWidth , textureHeight: window.innerHeight} );
-
-
-      // create the Shadermaterial for the water
-      /*
-      var shaderMaterial = new THREE.ShaderMaterial({
-        uniforms:        { reflectionTex: { type: 't',
-                  value: reflectionTexture.texture
-                  }},
-        vertexShader:   $('#vertexShader').text(),
-        fragmentShader: $('#fragmentShader').text(),
-        //depthWrite: false
-      });
-      */
-      //var shaderMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff, map: myTexture.texture});
 
       //material and mesh
       waterMesh = new THREE.Mesh(waterSurface, reflectionSurface.material);
