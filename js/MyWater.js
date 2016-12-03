@@ -1,14 +1,16 @@
 
 /**
  * Author Lovisa Hassler
- Water with reflection, refraction and ripples using dudv-mapping.
+ * Date: 6 Dec 2016
+ * EXPLANATION: Water with blended reflectiontextures and refractiontexture. Ripples using dudv-mapping.
  */
 
-
-//Based on Mirror.js written by
-/**
- * @author Slayvin / http://slayvin.net
- */
+//Honorable mentions and sources
+/*****************************************************************
+ * ThinMatrix / https://www.youtube.com/user/ThinMatrix : OpenGL water tutorial series
+ * Jonas Wagner / http://29a.ch/ && http://29a.ch/slides/2012/webglwater/ : Water shader explanations in WebGL
+ * Slayvin / http://slayvin.net : Based on his Mirror.js shader
+ *****************************************************************/
 
 THREE.ShaderLib[ 'water' ] = {
 
