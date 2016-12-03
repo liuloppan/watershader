@@ -12,58 +12,12 @@
 	<script src='js/controls/OrbitControls.js'></script>
   <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.5.1/jquery.min.js"></script>
 
-
-		<!-- VERTEXSHADER -->
-
-    <script id="vertexShader" type="x-shader/x-vertex">
-    // switch on high precision floats
-    #ifdef GL_ES
-    precision highp float;
-    #endif
-
-    varying vec2 vUv;
-
-    void main() {
-        vUv = uv;
-
-        gl_Position =   projectionMatrix * 
-                        modelViewMatrix * 
-                        vec4(position,1.0);
-    }
-    </script>
-
-    <!-- FRAGMENTSHADER -->
-
-    <script id="fragmentShader" type="x-shader/x-fragment">
-    #ifdef GL_ES
-    precision highp float;
-    #endif
-
-    //out vec4 out_Color;
-
-    uniform sampler2D reflectionTex;
-    varying vec2 vUv;
-
-    void main() {
-        
-        gl_FragColor = texture2D(reflectionTex, vUv);
-        //vec4 reflectColour = texture(reflectionTex, textureCoords);
-        //vec4 refractColor = texture(refractTex, textureCoords);
-
-        //out_Color = mix(reflectColour, refractColour, 0.5)
-    }
-    </script>
-
     <!-- MAIN -->
   <script id="Main" >
 
      //-----------GLOBAL VARIABLES-------------------
-    var scene, camera, controls, container;
-    var waterMesh, waterSurface;
-    var mainRenderer; 
-    var uniforms;
-
-    var reflectionTexture, reflectionSurface;
+    var scene, camera, controls, renderer;
+    var waterMesh, waterSurface, water;
 
      //-------------FUNCTIONS-------------------
 
@@ -73,9 +27,8 @@
 
       setupScenes();
 
-      mainRenderer = new THREE.WebGLRenderer();
+      renderer = new THREE.WebGLRenderer();
 
-      //RTT();
       loadWater();
 
 
@@ -85,13 +38,13 @@
       window.addEventListener('resize', updateViewport); 
 
 
-      document.body.appendChild(mainRenderer.domElement);
+      document.body.appendChild(renderer.domElement);
 
     };
 
 
     function updateViewport(){
-        mainRenderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setSize(window.innerWidth, window.innerHeight);
        //waterRenderer.setSize(window.innerWidth, window.innerHeight/2);
 
         camera.aspect = window.innerWidth / window.innerHeight;
@@ -101,27 +54,22 @@
     };
 
     function animate(){
-      //var dt;
-      //dt = Date.now() - now; // tidsskillnad
 
       requestAnimationFrame(animate);
       controls.update();
       render();
 
-      //return now = Date.now();
     }; 
 
     function render(){
 
-        mainRenderer.clear();
+        renderer.clear();
 
-        // Render first scene into texture
-
-        //mainRenderer.render(scene, reflectionCamera, reflectionTexture, true);
-        reflectionSurface.render();
+        // Render water 
+        water.render();
 
         //render scene
-        mainRenderer.render(scene, camera);
+        renderer.render(scene, camera);
 
     };
 
@@ -130,7 +78,6 @@
 
       camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 1, 10000);
       camera.position.set(-200,350,0);
-      //camera.rotation(x,y,z);
 
       //navigate in scene
       controls = new THREE.OrbitControls(camera);
@@ -142,18 +89,7 @@
       loadObjects();
 
     };
-/*
-    //render to texture
-    function RTT(){
 
-        // you may need to modify these parameters
-        var renderTargetParams = { minFilter: THREE.LinearFilter, magFilter: THREE.NearestFilter, format: THREE.RGBFormat } ;
-
-        // create buffer
-        reflectionTexture = new THREE.WebGLRenderTarget( window.innerWidth , window.innerHeight , renderTargetParams );
-    };
-
-*/
 
     loadWater= function(){
       //Storlek på vattenytan
@@ -163,11 +99,11 @@
       //Create water buffer plane
       waterSurface = new THREE.PlaneBufferGeometry(W,H);
 
-      reflectionSurface =  new THREE.Water( mainRenderer, camera, { textureWidth: window.innerWidth , textureHeight: window.innerHeight} );
+      water =  new THREE.Water( renderer, camera, { textureWidth: window.innerWidth , textureHeight: window.innerHeight} );
 
       //material and mesh
-      waterMesh = new THREE.Mesh(waterSurface, reflectionSurface.material);
-      waterMesh.add( reflectionSurface );
+      waterMesh = new THREE.Mesh(waterSurface, water.material);
+      waterMesh.add( water );
       scene.add(waterMesh);
 
       //transform matrix on watersurface
@@ -453,14 +389,7 @@
 
     animate();
 
-
-
-
-
 	</script>
-
-
-
 
 </body>
 </html>

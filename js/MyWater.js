@@ -1,6 +1,7 @@
 
 /**
  * Author Lovisa Hassler
+ Water with reflection, refraction and ripples using dudv-mapping.
  */
 
 
@@ -60,7 +61,6 @@ THREE.ShaderLib[ 'water' ] = {
 			"vec4 colorRef = texture2DProj(refractionSampler, refCoord);",
 
 			"colorRef = vec4(colorRef.r, colorRef.g, colorRef.b, 1.0);",
-
 
 			"colorMirror = vec4(colorMirror.r, colorMirror.g, colorMirror.b, 1.0);",
 
@@ -132,7 +132,6 @@ THREE.Water = function ( renderer, camera, options ) {
 	this.textureMatrixMirror = new THREE.Matrix4();
 	this.textureMatrixRefraction = new THREE.Matrix4();
 
-
 	//CAMERA cloning
 	this.mirrorCamera = this.camera.clone();
 	this.mirrorCamera.matrixAutoUpdate = true;
@@ -141,7 +140,6 @@ THREE.Water = function ( renderer, camera, options ) {
 	var parameters = { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, format: THREE.RGBFormat, stencilBuffer: false };
 
 	this.renderTargetReflection = new THREE.WebGLRenderTarget( width, height, parameters );
-	
 	this.renderTargetRefraction = new THREE.WebGLRenderTarget( width, height, parameters );
 
 	//Create the shader and shader materials
@@ -153,7 +151,6 @@ THREE.Water = function ( renderer, camera, options ) {
 		fragmentShader: waterShader.fragmentShader,
 		vertexShader: waterShader.vertexShader,
 		uniforms: waterUniforms,
-		transparent: true
 
 	} );
 
@@ -168,54 +165,50 @@ THREE.Water = function ( renderer, camera, options ) {
 
 		this.renderTargetReflection.texture.generateMipmaps = false;
 		this.renderTargetRefraction.texture.generateMipmaps = false;
-
 	}
 
 	this.updateTextureMatrixMirror();
 
-
 	this.render();
-
 };
 
 THREE.Water.prototype = Object.create( THREE.Object3D.prototype );
 THREE.Water.prototype.constructor = THREE.Water;
 
 
-
 THREE.Water.prototype.updateTextureMatrixMirror = function () {
 
-	//UPDATE TO CURRENT WORLD AND CAMERA FOR MIRROROBJECT
+	//update
 	this.updateMatrixWorld();
 	this.camera.updateMatrixWorld();
-	//COPY VALUES FROM WORLD AND CAMERA
+	//copy values from world and camera
 	this.mirrorWorldPosition.setFromMatrixPosition( this.matrixWorld );
 	this.cameraWorldPosition.setFromMatrixPosition( this.camera.matrixWorld );
 
 	this.rotationMatrix.extractRotation( this.matrixWorld );
-	//SET NORMAL, IS THIS USUALLY (0,0,-1)?
+	//set normal
 	this.normal.set( 0, 0, 1 );
 	this.normal.applyMatrix4( this.rotationMatrix );
- 	//CREATE VIEW
+ 	//new view
 	var view = this.mirrorWorldPosition.clone().sub( this.cameraWorldPosition );
 	view.reflect( this.normal ).negate();	//WHAT HAPPENS HERE??
 	view.add( this.mirrorWorldPosition );
 
 	this.rotationMatrix.extractRotation( this.camera.matrixWorld );
-	//SET LOOKAT
+	//set lookat
 	this.lookAtPosition.set( 0, 0, -1 );
 	this.lookAtPosition.applyMatrix4( this.rotationMatrix );
 	this.lookAtPosition.add( this.cameraWorldPosition );
-	//TARGET, WHAT IS THIS?
+	//set new target
 	var target = this.mirrorWorldPosition.clone().sub( this.lookAtPosition );
-	target.reflect( this.normal ).negate();  //WHAT HAPPENS HERE??
+	target.reflect( this.normal ).negate(); 
 	target.add( this.mirrorWorldPosition );
 
-	this.up.set( 0, -1, 0 ); //CHANGING TO NEG Y 
+	this.up.set( 0, -1, 0 );  
 	this.up.applyMatrix4( this.rotationMatrix );
 	this.up.reflect( this.normal ).negate();
 
-	//MIRRORCAMERA COPIES THE VALUES
+	//mirrorcamera copies values
 	this.mirrorCamera.position.copy( view );
 	this.mirrorCamera.up = this.up;
 	this.mirrorCamera.lookAt( target );
@@ -223,30 +216,25 @@ THREE.Water.prototype.updateTextureMatrixMirror = function () {
 	this.mirrorCamera.updateProjectionMatrix();
 	this.mirrorCamera.updateMatrixWorld();
 	this.mirrorCamera.matrixWorldInverse.getInverse( this.mirrorCamera.matrixWorld );
-	//THIS IS WHERE THE MAGIC HAPPENS, TEXTURE MATRIX IS UPDATED
-	// Update the texture matrix
+
+	// Update the texture matrices
 	this.textureMatrixMirror.set( 0.5, 0.0, 0.0, 0.5,
 							0.0, 0.5, 0.0, 0.5,
 							0.0, 0.0, 0.5, 0.5,
 							0.0, 0.0, 0.0, 1.0 );
-	//USE THE GENERATED MIRRORCAMERA TO GET MATRIX MULTIPLICATIONS
+
 	this.textureMatrixMirror.multiply( this.mirrorCamera.projectionMatrix ); 
 	this.textureMatrixMirror.multiply( this.mirrorCamera.matrixWorldInverse ); 
-
-
 
 	this.textureMatrixRefraction.set( -0.5, 0.0, 0.0, 0.5,
 							0.0, 0.5, 0.0, 0.5,
 							0.0, 0.0, 0.5, 0.5,
 							0.0, 0.0, 0.0, 1.0 );
-	//USE THE GENERATED MIRRORCAMERA TO GET MATRIX MULTIPLICATIONS
+
 	this.textureMatrixRefraction.multiply( this.mirrorCamera.projectionMatrix ); 
 	this.textureMatrixRefraction.multiply( this.mirrorCamera.matrixWorldInverse ); 
 
-	//this.textureMatrixRefraction.multiply( this.mirrorCamera.projectionMatrix ); 
-	//	this.textureMatrixRefraction.multiply( this.mirrorCamera.matrixWorld ); 
-	
-	// AS I UNDERSTAND, THIS DPART EALS WITH THE CLIPPING USING OBLIQUE FRUSTUMS
+
 	// Now update projection matrix with new clip plane, implementing code from: http://www.terathon.com/code/oblique.html
 	// Paper explaining this technique: http://www.terathon.com/lengyel/Lengyel-Oblique.pdf
 	this.waterPlane.setFromNormalAndCoplanarPoint( this.normal, this.mirrorWorldPosition );
@@ -299,8 +287,6 @@ THREE.Water.prototype.render = function () {
 		this.renderer.render( scene, this.mirrorCamera, this.renderTargetReflection, true );
 
 		this.material.visible = visible;
-
-
 
 	}
 
