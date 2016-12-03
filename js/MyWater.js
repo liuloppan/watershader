@@ -10,6 +10,7 @@
  * ThinMatrix / https://www.youtube.com/user/ThinMatrix : OpenGL water tutorial series
  * Jonas Wagner / http://29a.ch/ && http://29a.ch/slides/2012/webglwater/ : Water shader explanations in WebGL
  * Slayvin / http://slayvin.net : Based on his Mirror.js shader
+ * Eric Lengyel / http://www.terathon.com/lengyel/Lengyel-Oblique.pdf : Paper about clipping using oblique frustums
  *****************************************************************/
 
 THREE.ShaderLib[ 'water' ] = {
@@ -18,28 +19,29 @@ THREE.ShaderLib[ 'water' ] = {
 		"mirrorSampler": { value: null },
 		"textureMatrixMirror" : { value: new THREE.Matrix4() },
 		"textureMatrixRefraction" : { value: new THREE.Matrix4() },
-		"refractionSampler": { value: null} 
+		"refractionSampler": { value: null},
+		"dudvMap": { value: null}
 	},
 
 	vertexShader: [
 
 		"uniform mat4 textureMatrixMirror;",
-
 		"uniform mat4 textureMatrixRefraction;",
 
-		"varying vec4 waterCoord;",
-
+		"varying vec4 mirrorCoord;",
 		"varying vec4 refCoord;",
-
+		"varying vec4 textureCoord;",
+		
 
 		"void main() {",
 
 			"vec4 mvPosition = modelViewMatrix * vec4( position, 1.0 );",
 			"vec4 worldPosition = modelMatrix * vec4( position, 1.0 );",
-			"waterCoord = textureMatrixMirror * worldPosition;",
+			"mirrorCoord = textureMatrixMirror * worldPosition;",
 			"refCoord =   textureMatrixRefraction * worldPosition;",
 
 			"gl_Position = projectionMatrix * mvPosition;",
+
 
 		"}"
 
@@ -48,22 +50,27 @@ THREE.ShaderLib[ 'water' ] = {
 	fragmentShader: [
 
 		"uniform sampler2D mirrorSampler;",
-
 		"uniform sampler2D refractionSampler;",
+		"uniform sampler2D dudvMap;",
 
-		"varying vec4 waterCoord;",
-
+		"varying vec4 mirrorCoord;",
 		"varying vec4 refCoord;",
+
 
 
 		"void main() {",
 
-			"vec4 colorMirror = texture2DProj(mirrorSampler, waterCoord);",
+			"vec4 distortionMirror = texture2DProj(dudvMap, mirrorCoord) * 2.0;",
+			"vec4 distortionRef = texture2DProj(dudvMap, mirrorCoord) * 2.0;",
 
-			"vec4 colorRef = texture2DProj(refractionSampler, refCoord);",
+			"vec4 distMirrorCoord = mirrorCoord + distortionMirror;",
+
+			"vec4 distRefCoord = refCoord + distortionMirror;",
+
+			"vec4 colorMirror = texture2DProj(mirrorSampler, distMirrorCoord);",
+			"vec4 colorRef = texture2DProj(refractionSampler, distRefCoord);",
 
 			"colorRef = vec4(colorRef.r, colorRef.g, colorRef.b, 1.0);",
-
 			"colorMirror = vec4(colorMirror.r, colorMirror.g, colorMirror.b, 1.0);",
 
 			"vec4 colorWater = mix(colorMirror,colorRef, 0.5);",
@@ -160,7 +167,10 @@ THREE.Water = function ( renderer, camera, options ) {
 	this.material.uniforms.refractionSampler.value = this.renderTargetRefraction.texture;
 
 	this.material.uniforms.textureMatrixMirror.value = this.textureMatrixMirror;
-		this.material.uniforms.textureMatrixRefraction.value = this.textureMatrixRefraction;
+	this.material.uniforms.textureMatrixRefraction.value = this.textureMatrixRefraction;
+
+	//load dudv map
+	this.material.uniforms.dudvMap.value = new THREE.TextureLoader().load('textures/mapping/dudvmap.png');
 
 
 	if ( ! THREE.Math.isPowerOfTwo( width ) || ! THREE.Math.isPowerOfTwo( height ) ) {
@@ -169,7 +179,7 @@ THREE.Water = function ( renderer, camera, options ) {
 		this.renderTargetRefraction.texture.generateMipmaps = false;
 	}
 
-	this.updateTextureMatrixMirror();
+	this.updateTextureMatrices();
 
 	this.render();
 };
@@ -178,7 +188,7 @@ THREE.Water.prototype = Object.create( THREE.Object3D.prototype );
 THREE.Water.prototype.constructor = THREE.Water;
 
 
-THREE.Water.prototype.updateTextureMatrixMirror = function () {
+THREE.Water.prototype.updateTextureMatrices = function () {
 
 	//update
 	this.updateMatrixWorld();
@@ -235,8 +245,17 @@ THREE.Water.prototype.updateTextureMatrixMirror = function () {
 
 	this.textureMatrixRefraction.multiply( this.mirrorCamera.projectionMatrix ); 
 	this.textureMatrixRefraction.multiply( this.mirrorCamera.matrixWorldInverse ); 
+//this would be more appropriate for refraction, but does not look nice
+/*
+	this.textureMatrixRefraction.set( 0.5, 0.0, 0.0, 0.5,
+							0.0, 0.5, 0.0, 0.5,
+							0.0, 0.0, 0.5, 0.5,
+							0.0, 0.0, 0.0, 1.0 );
 
+	this.textureMatrixRefraction.multiply( this.camera.projectionMatrix ); 
+	this.textureMatrixRefraction.multiply( this.camera.matrixWorldInverse ); 
 
+*/
 	// Now update projection matrix with new clip plane, implementing code from: http://www.terathon.com/code/oblique.html
 	// Paper explaining this technique: http://www.terathon.com/lengyel/Lengyel-Oblique.pdf
 	this.waterPlane.setFromNormalAndCoplanarPoint( this.normal, this.mirrorWorldPosition );
@@ -266,7 +285,7 @@ THREE.Water.prototype.updateTextureMatrixMirror = function () {
 
 THREE.Water.prototype.render = function () {
 
-	if ( this.matrixNeedsUpdate ) this.updateTextureMatrixMirror();
+	if ( this.matrixNeedsUpdate ) this.updateTextureMatrices();
 
 	this.matrixNeedsUpdate = true;
 
