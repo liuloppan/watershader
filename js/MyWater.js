@@ -20,7 +20,8 @@ THREE.ShaderLib[ 'water' ] = {
 		"textureMatrixMirror" : { value: new THREE.Matrix4() },
 		"textureMatrixRefraction" : { value: new THREE.Matrix4() },
 		"refractionSampler": { value: null},
-		"dudvMap": { value: null}
+		"dudvMap": { value: null},
+		"moveFactor": { value: 0.0}
 	},
 
 	vertexShader: [
@@ -49,23 +50,28 @@ THREE.ShaderLib[ 'water' ] = {
 
 	fragmentShader: [
 
+
+		"varying vec4 mirrorCoord;",
+		"varying vec4 refCoord;",
+
 		"uniform sampler2D mirrorSampler;",
 		"uniform sampler2D refractionSampler;",
 		"uniform sampler2D dudvMap;",
 
-		"varying vec4 mirrorCoord;",
-		"varying vec4 refCoord;",
+		"const float waveStrength = 2.0;",
+		"uniform float moveFactor;",
 
 
 
 		"void main() {",
 
-			"vec4 distortionMirror = texture2DProj(dudvMap, mirrorCoord) * 2.0;",
-			"vec4 distortionRef = texture2DProj(dudvMap, mirrorCoord) * 2.0;",
+			"vec4 moveVec1 = vec4(moveFactor, moveFactor,0,0);",
+
+			"vec4 distortionMirror = texture2DProj(dudvMap, mirrorCoord) * waveStrength;",
+			"vec4 distortionRef = texture2DProj(dudvMap, refCoord + moveVec1) * waveStrength;",
 
 			"vec4 distMirrorCoord = mirrorCoord + distortionMirror;",
-
-			"vec4 distRefCoord = refCoord + distortionMirror;",
+			"vec4 distRefCoord = refCoord + distortionRef;",
 
 			"vec4 colorMirror = texture2DProj(mirrorSampler, distMirrorCoord);",
 			"vec4 colorRef = texture2DProj(refractionSampler, distRefCoord);",
@@ -74,6 +80,7 @@ THREE.ShaderLib[ 'water' ] = {
 			"colorMirror = vec4(colorMirror.r, colorMirror.g, colorMirror.b, 1.0);",
 
 			"vec4 colorWater = mix(colorMirror,colorRef, 0.5);",
+			"colorWater = mix(colorWater,vec4(0.0,0.3,0.5,1.0), 0.1);",
 
 			"gl_FragColor = colorWater;",
 
@@ -97,6 +104,8 @@ THREE.Water = function ( renderer, camera, options ) {
 	var height = options.textureHeight !== undefined ? options.textureHeight : 512;
 
 	this.clipBias = options.clipBias !== undefined ? options.clipBias : 0.0;
+	this.waveSpeed = options.waveSpeed !== undefined ? options.waveSpeed : 0.003;
+
 
 	this.renderer = renderer;
 	this.waterPlane = new THREE.Plane();
@@ -106,6 +115,10 @@ THREE.Water = function ( renderer, camera, options ) {
 	this.rotationMatrix = new THREE.Matrix4();
 	this.lookAtPosition = new THREE.Vector3( 0, 0, - 1 );
 	this.clipPlane = new THREE.Vector4();
+	this.time = 0.0;
+		this.now = 0.0;
+
+	this.rippleMoveFactor = 0.0;
 
 
 /*	// For debug only, show the normal and plane of the mirror
@@ -162,15 +175,15 @@ THREE.Water = function ( renderer, camera, options ) {
 		uniforms: waterUniforms,
 
 	} );
-
+	//Set all the necessary uniforms
 	this.material.uniforms.mirrorSampler.value = this.renderTargetReflection.texture;
 	this.material.uniforms.refractionSampler.value = this.renderTargetRefraction.texture;
 
 	this.material.uniforms.textureMatrixMirror.value = this.textureMatrixMirror;
 	this.material.uniforms.textureMatrixRefraction.value = this.textureMatrixRefraction;
 
-	//load dudv map
 	this.material.uniforms.dudvMap.value = new THREE.TextureLoader().load('textures/mapping/dudvmap.png');
+
 
 
 	if ( ! THREE.Math.isPowerOfTwo( width ) || ! THREE.Math.isPowerOfTwo( height ) ) {
@@ -179,7 +192,8 @@ THREE.Water = function ( renderer, camera, options ) {
 		this.renderTargetRefraction.texture.generateMipmaps = false;
 	}
 
-	this.updateTextureMatrices();
+	this.updateTextureMatrices();        
+
 
 	this.render();
 };
@@ -189,6 +203,23 @@ THREE.Water.prototype.constructor = THREE.Water;
 
 
 THREE.Water.prototype.updateTextureMatrices = function () {
+
+  var dt;
+  dt = Date.now() - this.now;
+
+	this.time += 1.0 / 60.0;
+	//this.time %= (Math.PI);
+	//this.time %= 600; //prevent time from reaching a crazy high number
+	this.rippleMoveFactor += this.waveSpeed * dt;
+	//this.rippleMoveFactor %= 10; //loop the move factor so it doesn't get larger than 1
+	//console.log(this.rippleMoveFactor);
+	console.log(dt);
+
+	this.rippleMoveFactor = (0.5+Math.cos(this.time)) * 10;
+	//console.log(this.rippleMoveFactor);
+
+	//console.log(this.rippleMoveFactor);
+	this.material.uniforms.moveFactor.value = this.rippleMoveFactor;
 
 	//update
 	this.updateMatrixWorld();
@@ -281,6 +312,8 @@ THREE.Water.prototype.updateTextureMatrices = function () {
 	projectionMatrix.elements[ 10 ] = c.z + 1.0 - this.clipBias;
 	projectionMatrix.elements[ 14 ] = c.w;
 
+	this.now = Date.now();
+
 };
 
 THREE.Water.prototype.render = function () {
@@ -289,7 +322,7 @@ THREE.Water.prototype.render = function () {
 
 	this.matrixNeedsUpdate = true;
 
-	// Render the mirrored view of the current scene into the target texture
+
 	var scene = this;
 
 	while ( scene.parent !== null ) {
@@ -303,6 +336,7 @@ THREE.Water.prototype.render = function () {
 		// We can't render ourself to ourself
 		var visible = this.material.visible;
 		this.material.visible = false;
+		// Render the mirrored view and refraction of the current scene into the target textures
 		this.renderer.render( scene, camera, this.renderTargetRefraction, true );
 
 		this.renderer.render( scene, this.mirrorCamera, this.renderTargetReflection, true );
@@ -310,6 +344,7 @@ THREE.Water.prototype.render = function () {
 		this.material.visible = visible;
 
 	}
+
 
 };
 
