@@ -65,16 +65,18 @@ THREE.ShaderLib[ 'water' ] = {
 
 		"void main() {",
 
-			"vec4 moveVec1 = vec4(moveFactor, moveFactor,0,0);",
 
-			"vec4 distortionMirror = texture2DProj(dudvMap, mirrorCoord) * waveStrength;",
-			"vec4 distortionRef = texture2DProj(dudvMap, refCoord + moveVec1) * waveStrength;",
+			"vec4 moveVec1 = vec4(moveFactor, 0,0,0);",
+			"vec4 moveVec2 = vec4(-moveFactor, moveFactor + moveFactor ,0,0);",
+
+			"vec4 distortionMirror = texture2DProj(dudvMap, mirrorCoord + moveVec2) * waveStrength;",
+			"vec4 distortionRef = texture2DProj(dudvMap, refCoord+ moveVec1) * waveStrength;",
 
 			"vec4 distMirrorCoord = mirrorCoord + distortionMirror;",
 			"vec4 distRefCoord = refCoord + distortionRef;",
 
 			"vec4 colorMirror = texture2DProj(mirrorSampler, distMirrorCoord);",
-			"vec4 colorRef = texture2DProj(refractionSampler, distRefCoord);",
+			"vec4 colorRef = texture2DProj(refractionSampler, distRefCoord );",
 
 			"colorRef = vec4(colorRef.r, colorRef.g, colorRef.b, 1.0);",
 			"colorMirror = vec4(colorMirror.r, colorMirror.g, colorMirror.b, 1.0);",
@@ -204,21 +206,10 @@ THREE.Water.prototype.constructor = THREE.Water;
 
 THREE.Water.prototype.updateTextureMatrices = function () {
 
-  var dt;
-  dt = Date.now() - this.now;
-
 	this.time += 1.0 / 60.0;
-	//this.time %= (Math.PI);
-	//this.time %= 600; //prevent time from reaching a crazy high number
-	this.rippleMoveFactor += this.waveSpeed * dt;
-	//this.rippleMoveFactor %= 10; //loop the move factor so it doesn't get larger than 1
-	//console.log(this.rippleMoveFactor);
-	console.log(dt);
-
-	this.rippleMoveFactor = (0.5+Math.cos(this.time)) * 10;
-	//console.log(this.rippleMoveFactor);
-
-	//console.log(this.rippleMoveFactor);
+	this.time - Math.PI/2
+	this.rippleMoveFactor += this.time * this.waveSpeed;
+	this.rippleMoveFactor = (Math.sin(this.time) ) * 10 + 5* Math.cos(this.time);
 	this.material.uniforms.moveFactor.value = this.rippleMoveFactor;
 
 	//update
@@ -312,7 +303,6 @@ THREE.Water.prototype.updateTextureMatrices = function () {
 	projectionMatrix.elements[ 10 ] = c.z + 1.0 - this.clipBias;
 	projectionMatrix.elements[ 14 ] = c.w;
 
-	this.now = Date.now();
 
 };
 
