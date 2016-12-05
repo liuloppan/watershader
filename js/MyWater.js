@@ -62,7 +62,6 @@ THREE.ShaderLib[ 'water' ] = {
 		"uniform float moveFactor;",
 
 
-
 		"void main() {",
 
 
@@ -117,40 +116,16 @@ THREE.Water = function ( renderer, camera, options ) {
 	this.rotationMatrix = new THREE.Matrix4();
 	this.lookAtPosition = new THREE.Vector3( 0, 0, - 1 );
 	this.clipPlane = new THREE.Vector4();
+	
 	this.time = 0.0;
-		this.now = 0.0;
-
 	this.rippleMoveFactor = 0.0;
 
 
-/*	// For debug only, show the normal and plane of the mirror
-	var debugMode = options.debugMode !== undefined ? options.debugMode : false;
-
-	if ( debugMode ) {
-
-		var arrow = new THREE.ArrowHelper( new THREE.Vector3( 0, 0, 1 ), new THREE.Vector3( 0, 0, 0 ), 10, 0xffff80 );
-		var planeGeometry = new THREE.Geometry();
-		planeGeometry.vertices.push( new THREE.Vector3( - 10, - 10, 0 ) );
-		planeGeometry.vertices.push( new THREE.Vector3( 10, - 10, 0 ) );
-		planeGeometry.vertices.push( new THREE.Vector3( 10, 10, 0 ) );
-		planeGeometry.vertices.push( new THREE.Vector3( - 10, 10, 0 ) );
-		planeGeometry.vertices.push( planeGeometry.vertices[ 0 ] );
-		var plane = new THREE.Line( planeGeometry, new THREE.LineBasicMaterial( { color: 0xffff80 } ) );
-
-		this.add( arrow );
-		this.add( plane );
-
-	}
-*/
 	if ( camera instanceof THREE.PerspectiveCamera ) {
-
 		this.camera = camera;
-
 	} else {
-
 		this.camera = new THREE.PerspectiveCamera();
 		console.log( this.name + ': camera is not a Perspective Camera!' );
-
 	}
 	//Creates texture matrix 
 	this.textureMatrixMirror = new THREE.Matrix4();
@@ -159,6 +134,8 @@ THREE.Water = function ( renderer, camera, options ) {
 	//CAMERA cloning
 	this.mirrorCamera = this.camera.clone();
 	this.mirrorCamera.matrixAutoUpdate = true;
+	this.refractionCamera = this.camera.clone();
+	this.refractionCamera.matrixAutoUpdate = true;
 
 	//Create render target and parameters to render to texture
 	var parameters = { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, format: THREE.RGBFormat, stencilBuffer: false };
@@ -196,7 +173,6 @@ THREE.Water = function ( renderer, camera, options ) {
 
 	this.updateTextureMatrices();        
 
-
 	this.render();
 };
 
@@ -205,12 +181,6 @@ THREE.Water.prototype.constructor = THREE.Water;
 
 
 THREE.Water.prototype.updateTextureMatrices = function () {
-
-	this.time += 1.0 / 60.0;
-	this.time - Math.PI/2
-	this.rippleMoveFactor += this.time * this.waveSpeed;
-	this.rippleMoveFactor = (Math.sin(this.time) ) * 10 + 5* Math.cos(this.time);
-	this.material.uniforms.moveFactor.value = this.rippleMoveFactor;
 
 	//update
 	this.updateMatrixWorld();
@@ -233,10 +203,11 @@ THREE.Water.prototype.updateTextureMatrices = function () {
 	this.lookAtPosition.set( 0, 0, -1 );
 	this.lookAtPosition.applyMatrix4( this.rotationMatrix );
 	this.lookAtPosition.add( this.cameraWorldPosition );
+
 	//set new target
-	var target = this.mirrorWorldPosition.clone().sub( this.lookAtPosition );
+	var target = this.mirrorWorldPosition.clone().sub( this.lookAtPosition ); //subtracts lookAtPos from mirrorWorldPos
 	target.reflect( this.normal ).negate(); 
-	target.add( this.mirrorWorldPosition );
+	target.add( this.mirrorWorldPosition ); //additions mirrorworldposition
 
 	this.up.set( 0, -1, 0 );  
 	this.up.applyMatrix4( this.rotationMatrix );
@@ -251,7 +222,16 @@ THREE.Water.prototype.updateTextureMatrices = function () {
 	this.mirrorCamera.updateMatrixWorld();
 	this.mirrorCamera.matrixWorldInverse.getInverse( this.mirrorCamera.matrixWorld );
 
-	// Update the texture matrices
+	//refractionCamera copies values from the regular camera
+	this.refractionCamera.position.copy( this.camera.position );
+	this.refractionCamera.projectionMatrix.copy( this.camera.projectionMatrix );
+	this.refractionCamera.rotation.copy( this.camera.rotation );
+
+	this.refractionCamera.updateProjectionMatrix();
+	this.refractionCamera.updateMatrixWorld();
+	this.refractionCamera.matrixWorldInverse.getInverse( this.camera.matrixWorld );
+
+	// Update both the texture matrices
 	this.textureMatrixMirror.set( 0.5, 0.0, 0.0, 0.5,
 							0.0, 0.5, 0.0, 0.5,
 							0.0, 0.0, 0.5, 0.5,
@@ -260,55 +240,30 @@ THREE.Water.prototype.updateTextureMatrices = function () {
 	this.textureMatrixMirror.multiply( this.mirrorCamera.projectionMatrix ); 
 	this.textureMatrixMirror.multiply( this.mirrorCamera.matrixWorldInverse ); 
 
-	this.textureMatrixRefraction.set( -0.5, 0.0, 0.0, 0.5,
-							0.0, 0.5, 0.0, 0.5,
-							0.0, 0.0, 0.5, 0.5,
-							0.0, 0.0, 0.0, 1.0 );
-
-	this.textureMatrixRefraction.multiply( this.mirrorCamera.projectionMatrix ); 
-	this.textureMatrixRefraction.multiply( this.mirrorCamera.matrixWorldInverse ); 
-//this would be more appropriate for refraction, but does not look nice
-/*
 	this.textureMatrixRefraction.set( 0.5, 0.0, 0.0, 0.5,
 							0.0, 0.5, 0.0, 0.5,
 							0.0, 0.0, 0.5, 0.5,
 							0.0, 0.0, 0.0, 1.0 );
 
-	this.textureMatrixRefraction.multiply( this.camera.projectionMatrix ); 
-	this.textureMatrixRefraction.multiply( this.camera.matrixWorldInverse ); 
+	this.textureMatrixRefraction.multiply( this.refractionCamera.projectionMatrix ); 
+	this.textureMatrixRefraction.multiply( this.refractionCamera.matrixWorldInverse ); 
 
-*/
-	// Now update projection matrix with new clip plane, implementing code from: http://www.terathon.com/code/oblique.html
-	// Paper explaining this technique: http://www.terathon.com/lengyel/Lengyel-Oblique.pdf
+
+	// Now update projection matrix with new clip plane
 	this.waterPlane.setFromNormalAndCoplanarPoint( this.normal, this.mirrorWorldPosition );
 	this.waterPlane.applyMatrix4( this.mirrorCamera.matrixWorldInverse );
 
-	this.clipPlane.set( this.waterPlane.normal.x, this.waterPlane.normal.y, this.waterPlane.normal.z, this.waterPlane.constant );
-
-	var q = new THREE.Vector4();
-	var projectionMatrix = this.mirrorCamera.projectionMatrix;
-
-	q.x = ( Math.sign( this.clipPlane.x ) + projectionMatrix.elements[ 8 ] ) / projectionMatrix.elements[ 0 ];
-	q.y = ( Math.sign( this.clipPlane.y ) + projectionMatrix.elements[ 9 ] ) / projectionMatrix.elements[ 5 ];
-	q.z = - 1.0;
-	q.w = ( 1.0 + projectionMatrix.elements[ 10 ] ) / projectionMatrix.elements[ 14 ];
-
-	// Calculate the scaled plane vector
-	var c = new THREE.Vector4();
-	c = this.clipPlane.multiplyScalar( 2.0 / this.clipPlane.dot( q ) );
-
-	// Replacing the third row of the projection matrix
-	projectionMatrix.elements[ 2 ] = c.x;
-	projectionMatrix.elements[ 6 ] = c.y;
-	projectionMatrix.elements[ 10 ] = c.z + 1.0 - this.clipBias;
-	projectionMatrix.elements[ 14 ] = c.w;
-
+	this.applyClipping(this.mirrorCamera, this.waterPlane);
+	this.applyClipping(this.refractionCamera, this.waterPlane);
 
 };
 
 THREE.Water.prototype.render = function () {
 
-	if ( this.matrixNeedsUpdate ) this.updateTextureMatrices();
+	if ( this.matrixNeedsUpdate ){
+		this.calculateRippleMoveFactor();
+		this.updateTextureMatrices();
+	}
 
 	this.matrixNeedsUpdate = true;
 
@@ -327,7 +282,7 @@ THREE.Water.prototype.render = function () {
 		var visible = this.material.visible;
 		this.material.visible = false;
 		// Render the mirrored view and refraction of the current scene into the target textures
-		this.renderer.render( scene, camera, this.renderTargetRefraction, true );
+		this.renderer.render( scene, this.refractionCamera, this.renderTargetRefraction, true );
 
 		this.renderer.render( scene, this.mirrorCamera, this.renderTargetReflection, true );
 
@@ -338,54 +293,44 @@ THREE.Water.prototype.render = function () {
 
 };
 
+// Now update projection matrix with new clip plane, implementing code from: http://www.terathon.com/code/oblique.html
+// Paper explaining this technique: http://www.terathon.com/lengyel/Lengyel-Oblique.pdf
 
-/* only necessary if you use two mirrors
-THREE.Mirror.prototype.renderWithMirror = function ( otherMirror ) {
+THREE.Water.prototype.applyClipping = function (aCamera, aClipPlane) {
 
-	// update the mirror matrix to mirror the current view
-	this.updateTextureMatrix();
-	this.matrixNeedsUpdate = false;
+	this.clipPlane.set( aClipPlane.normal.x, aClipPlane.normal.y, aClipPlane.normal.z, aClipPlane.constant );
 
-	// set the camera of the other mirror so the mirrored view is the reference view
-	var tempCamera = otherMirror.camera;
-	otherMirror.camera = this.mirrorCamera;
+	var q = new THREE.Vector4();
+	var projectionMatrix = aCamera.projectionMatrix;
 
-	// render the other mirror in temp texture
-	otherMirror.renderTemp();
-	otherMirror.material.uniforms.mirrorSampler.value = otherMirror.renderTarget2.texture;
+	q.x = ( Math.sign( this.clipPlane.x ) + projectionMatrix.elements[ 8 ] ) / projectionMatrix.elements[ 0 ];
+	q.y = ( Math.sign( this.clipPlane.y ) + projectionMatrix.elements[ 9 ] ) / projectionMatrix.elements[ 5 ];
+	q.z = - 1.0;
+	q.w = ( 1.0 + projectionMatrix.elements[ 10 ] ) / projectionMatrix.elements[ 14 ];
 
-	// render the current mirror
-	this.render();
-	this.matrixNeedsUpdate = true;
+	// Calculate the scaled plane vector
+	var c = new THREE.Vector4();
+	c = this.clipPlane.multiplyScalar( 2.0 / this.clipPlane.dot( q ) );
 
-	// restore material and camera of other mirror
-	otherMirror.material.uniforms.mirrorSampler.value = otherMirror.renderTarget.texture;
-	otherMirror.camera = tempCamera;
+	// Replacing the third row of the projection matrix
+	projectionMatrix.elements[ 2 ] = c.x;
+	projectionMatrix.elements[ 6 ] = c.y;
+	projectionMatrix.elements[ 10 ] = c.z + 1.0 - this.clipBias;
+	projectionMatrix.elements[ 14 ] = c.w;
 
-	// restore texture matrix of other mirror
-	otherMirror.updateTextureMatrix();
+	return aCamera;
+ 	};
 
-};*/
-/*
-THREE.Mirror.prototype.renderTemp = function () {
 
-	if ( this.matrixNeedsUpdate ) this.updateTextureMatrix();
+ 	THREE.Water.prototype.calculateRippleMoveFactor = function () {
 
-	this.matrixNeedsUpdate = true;
+ 			//calculate moveFactor
+	this.time += 1.0 / 60.0;
+	this.time - Math.PI/2
+	this.rippleMoveFactor += this.time * this.waveSpeed;
+	this.rippleMoveFactor = (Math.sin(this.time) ) * 10 + 5* Math.cos(this.time);
+	this.material.uniforms.moveFactor.value = this.rippleMoveFactor;
 
-	// Render the mirrored view of the current scene into the target texture
-	var scene = this;
 
-	while ( scene.parent !== null ) {
 
-		scene = scene.parent;
-
-	}
-
-	if ( scene !== undefined && scene instanceof THREE.Scene ) {
-
-		this.renderer.render( scene, this.mirrorCamera, this.renderTarget2, true );
-
-	}
-
-};*/
+ 	};
