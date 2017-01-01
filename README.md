@@ -1,2 +1,2 @@
-# Watershader implementation using GLSL
-Computer Graphics master course at Yuan Ze UNiversity, Taiwan
+# Watershader implementation using GLSL and WebGL javascript (Three.js library)
+Computer Graphics master course at Yuan Ze University, Taiwan
