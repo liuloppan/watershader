@@ -1,2 +1,2 @@
 # Watershader implementation using GLSL
-Computer GRaphics master course at Yuan Ze UNiversity, Taiwan
+Computer Graphics master course at Yuan Ze UNiversity, Taiwan
